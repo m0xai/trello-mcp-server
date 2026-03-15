@@ -69,29 +69,55 @@ uv run mcp install main.py
 
 ## Server Modes
 
-This MCP server can run in two different modes:
+This MCP server supports three transport modes, selected via the `--transport` flag:
 
-### Claude App Mode
+### stdio (default)
 
-This mode integrates directly with the Claude Desktop application:
+For local use with Claude Desktop or other MCP clients that launch the server as a subprocess:
 
-1. Set `USE_CLAUDE_APP=true` in your `.env` file (this is the default)
-2. Run the server with:
 ```bash
-uv run mcp install main.py
-```
-3. Restart the Claude Desktop application
-
-### SSE Server Mode
-
-This mode runs as a standalone SSE server that can be used with any MCP-compatible client, including Cursor:
-
-1. Set `USE_CLAUDE_APP=false` in your `.env` file
-2. Run the server with:
-```bash
+python main.py --transport stdio
+# or simply:
 python main.py
 ```
-3. The server will be available at `http://localhost:8000` by default (or your configured port)
+
+### SSE (legacy HTTP)
+
+Runs as a standalone SSE server on localhost. No authentication — suitable for local use only:
+
+```bash
+python main.py --transport sse
+```
+
+The server will be available at `http://localhost:8000` (or your configured port).
+
+### HTTP (SSE + OAuth 2.0)
+
+Runs as a remote SSE server with OAuth 2.0 authentication. Suitable for deployment to public URLs (Railway, Fly.io, etc.) and use with Claude.ai, Claude mobile, or any remote MCP client:
+
+```bash
+python main.py --transport http
+```
+
+**Required environment variable:** `MCP_AUTH_TOKEN` — a password used for the OAuth login flow.
+
+The server exposes:
+- `/.well-known/oauth-authorization-server` — OAuth metadata discovery
+- `/.well-known/oauth-protected-resource` — protected resource metadata
+- `/register` — dynamic client registration
+- `/authorize` → `/login` — browser-based password login
+- `/token` — token exchange (authorization_code + refresh_token)
+- `/sse`, `/messages/` — MCP SSE transport (bearer token required)
+- `/health` — health check (no auth)
+
+**OAuth flow:**
+1. Client registers at `POST /register`
+2. Client redirects to `/authorize` with PKCE challenge
+3. User enters the `MCP_AUTH_TOKEN` password in the browser
+4. Server issues HMAC-signed access (24h) and refresh (30d) tokens
+5. Client uses bearer token for subsequent MCP requests
+
+Tokens are stateless (HMAC-signed) so they survive server restarts.
 
 ### Docker Mode
 
@@ -121,10 +147,10 @@ The server can be configured using environment variables in the `.env` file:
 |----------|-------------|---------|
 | TRELLO_API_KEY | Your Trello API key | Required |
 | TRELLO_TOKEN | Your Trello API token | Required |
-| MCP_SERVER_NAME | The name of the MCP server | Trello MCP Server |
-| MCP_SERVER_HOST | Host address for SSE mode | 0.0.0.0 |
-| MCP_SERVER_PORT | Port for SSE mode | 8000 |
-| USE_CLAUDE_APP | Whether to use Claude app mode | true |
+| MCP_AUTH_TOKEN | Server password for OAuth login (HTTP mode only) | Required for `--transport http` |
+| MCP_SERVER_HOST | Host address for SSE/HTTP mode | 0.0.0.0 |
+| MCP_SERVER_PORT | Port for SSE/HTTP mode | 8000 |
+| PORT | Alternative port (used by Railway/Fly.io) | 8000 |
 
 You can customize the server by editing these values in your `.env` file.
 
@@ -156,6 +182,13 @@ You can also add this configuration to your Cursor settings JSON file (typically
   }
 }
 ```
+
+### Using with Claude.ai / Claude Mobile (Remote)
+
+1. Deploy the server with `--transport http` to a public host (Railway, Fly.io, etc.)
+2. Set `TRELLO_API_KEY`, `TRELLO_TOKEN`, and `MCP_AUTH_TOKEN` as environment variables
+3. In Claude.ai, add the server URL as a remote MCP integration
+4. Complete the OAuth flow when prompted (enter your `MCP_AUTH_TOKEN` password)
 
 ### Using with Other MCP Clients
 
