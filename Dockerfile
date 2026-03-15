@@ -8,16 +8,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY pyproject.toml uv.lock ./
-RUN pip install --no-cache-dir uv && \
-    uv pip install --system -e .
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir \
+    "mcp[cli]>=1.6.0" \
+    "httpx>=0.28.1" \
+    "uvicorn>=0.30.0" \
+    "starlette>=0.37.0" \
+    "python-dotenv>=1.0.0"
 
 # Copy application code
 COPY . .
-
-# Expose port
-ENV MCP_SERVER_PORT=8000
-EXPOSE ${MCP_SERVER_PORT}
 
 # Run the application in HTTP mode with OAuth
 CMD ["python", "main.py", "--transport", "http"]

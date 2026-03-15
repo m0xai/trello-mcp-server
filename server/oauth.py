@@ -1,21 +1,24 @@
 """
-OAuth 2.0 provider for single-user MCP server with SSE transport.
+OAuth 2.0 provider for single-user MCP server with Streamable HTTP transport.
 
 Uses HMAC-signed tokens so access/refresh tokens survive server restarts.
 Only auth codes and pending sessions are in-memory (short-lived).
 """
 
 import base64
+import contextlib
 import hashlib
 import hmac
 import json
 import logging
 import secrets
 import time
+from collections.abc import AsyncIterator
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
-from mcp.server.sse import SseServerTransport
+from mcp.server.lowlevel.server import Server
+from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -197,7 +200,7 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-def create_http_app(mcp_server, auth_token: str) -> Starlette:
+def create_http_app(mcp_server: Server, auth_token: str) -> Starlette:
     """Create a Starlette app with OAuth 2.0 authentication for remote MCP access.
 
     Args:
@@ -205,7 +208,7 @@ def create_http_app(mcp_server, auth_token: str) -> Starlette:
         auth_token: The password/token used for the OAuth login flow.
     """
     oauth = SimpleOAuthProvider(auth_token)
-    sse = SseServerTransport("/messages/")
+    session_manager = StreamableHTTPSessionManager(app=mcp_server)
 
     async def handle_oauth_metadata(request: Request) -> Response:
         server_url = str(request.base_url).rstrip("/")
@@ -316,52 +319,37 @@ def create_http_app(mcp_server, auth_token: str) -> Starlette:
             return JSONResponse({"error": error}, status_code=400)
         return JSONResponse(tokens)
 
-    def _check_bearer(request: Request) -> Optional[Response]:
-        """Validate bearer token. Returns an error Response if invalid, None if OK."""
+    async def handle_mcp(scope, receive, send):
+        request = Request(scope, receive, send)
         server_url = str(request.base_url).rstrip("/")
         www_auth = f'Bearer resource_metadata="{server_url}/.well-known/oauth-protected-resource"'
         auth_header = request.headers.get("authorization", "")
         if not auth_header.startswith("Bearer "):
-            return JSONResponse(
+            response = JSONResponse(
                 {"error": "Missing bearer token"},
                 status_code=401,
                 headers={"WWW-Authenticate": www_auth},
             )
+            await response(scope, receive, send)
+            return
         token = auth_header[len("Bearer ") :]
         if not oauth.validate_token(token):
-            return JSONResponse(
+            response = JSONResponse(
                 {"error": "Invalid or expired token"},
                 status_code=401,
                 headers={"WWW-Authenticate": www_auth},
             )
-        return None
-
-    async def handle_sse_endpoint(request: Request) -> Response:
-        """SSE endpoint with OAuth bearer token validation."""
-        error = _check_bearer(request)
-        if error:
-            return error
-        async with sse.connect_sse(
-            request.scope, request.receive, request._send
-        ) as streams:
-            await mcp_server.run(
-                streams[0],
-                streams[1],
-                mcp_server.create_initialization_options(),
-            )
-        return Response()
-
-    async def handle_messages(scope, receive, send):
-        """Messages endpoint with OAuth bearer token validation."""
-        request = Request(scope, receive, send)
-        error = _check_bearer(request)
-        if error:
-            await error(scope, receive, send)
+            await response(scope, receive, send)
             return
-        await sse.handle_post_message(scope, receive, send)
+        await session_manager.handle_request(scope, receive, send)
 
     async def handle_health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "server": "trello-mcp"})
+
+    @contextlib.asynccontextmanager
+    async def lifespan(starlette_app: Starlette) -> AsyncIterator[None]:
+        async with session_manager.run():
+            yield
 
     return Starlette(
         routes=[
@@ -380,7 +368,7 @@ def create_http_app(mcp_server, auth_token: str) -> Starlette:
             Route("/login", endpoint=handle_login, methods=["GET", "POST"]),
             Route("/token", endpoint=handle_token, methods=["POST"]),
             Route("/health", endpoint=handle_health, methods=["GET"]),
-            Route("/sse", endpoint=handle_sse_endpoint),
-            Mount("/messages/", app=handle_messages),
+            Mount("/mcp", app=handle_mcp),
         ],
+        lifespan=lifespan,
     )
