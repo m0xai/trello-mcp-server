@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -6,7 +8,8 @@ class CreateCardPayload(BaseModel):
     Payload for creating a card.
 
     Attributes:
-        name (str): The name of the card.
+        name (str): The name of the card. For smart cards (board, link, mirror),
+            set this to the URL.
         desc (str): The description of the card.
         closed (bool): Whether the card is closed or not.
         idMembers (str): Comma-separated list of member IDs for the card.
@@ -18,6 +21,11 @@ class CreateCardPayload(BaseModel):
         start (str): The start date of the card in ISO 8601 format.
         dueComplete (bool): Whether the card is due complete or not.
         subscribed (bool): Whether the card is subscribed or not.
+        cardRole (str): The card's display role. Use "board" with a Trello board
+            URL as name to render as a board link. Use "link" with an external URL
+            (GitHub, YouTube, etc.) to render as a rich link preview. Use "mirror"
+            with a Trello card URL to render as a mirrored card. Use "separator"
+            to render as a visual divider.
     """
 
     name: str
@@ -32,3 +40,4 @@ class CreateCardPayload(BaseModel):
     start: str | None = None
     dueComplete: bool | None = None
     subscribed: bool | None = None
+    cardRole: Literal["board", "link", "mirror", "separator"] | None = None

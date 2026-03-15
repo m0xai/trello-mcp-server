@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel
 
 
@@ -18,6 +20,7 @@ class UpdateCardPayload(BaseModel):
         start (str): The start date of the card in ISO 8601 format.
         dueComplete (bool): Whether the card is due complete or not.
         subscribed (bool): Whether the card is subscribed or not.
+        cardRole (str): The card's display role: "board", "link", "mirror", or "separator".
     """
 
     name: str | None = None
@@ -32,3 +35,4 @@ class UpdateCardPayload(BaseModel):
     start: str | None = None
     dueComplete: bool | None = None
     subscribed: bool | None = None
+    cardRole: Literal["board", "link", "mirror", "separator"] | None = None
