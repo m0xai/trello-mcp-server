@@ -93,6 +93,26 @@ class TrelloClient:
             logger.error(f"Request error: {e}")
             raise httpx.RequestError(f"Failed to post form to {endpoint}: {str(e)}")
 
+    async def POST_FILE(self, endpoint: str, file_data: bytes, filename: str, mime_type: str, data: dict = None):
+        all_params = {"key": self.api_key, "token": self.token}
+        files = {"file": (filename, file_data, mime_type)}
+        try:
+            response = await self.client.post(
+                endpoint, params=all_params, files=files, data=data or {}
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error: {e}")
+            raise httpx.HTTPStatusError(
+                f"Failed to upload file to {endpoint}: {str(e)}",
+                request=e.request,
+                response=e.response,
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}")
+            raise httpx.RequestError(f"Failed to upload file to {endpoint}: {str(e)}")
+
     async def DELETE(self, endpoint: str, params: dict = None):
         all_params = {"key": self.api_key, "token": self.token}
         if params:

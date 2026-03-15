@@ -2,6 +2,7 @@
 This module contains tools for managing Trello card comments and attachments.
 """
 
+import base64
 import logging
 from typing import List
 
@@ -132,28 +133,42 @@ async def get_attachments(ctx: Context, card_id: str) -> List[TrelloAttachment]:
 async def add_attachment(
     ctx: Context,
     card_id: str,
-    url: str,
+    url: str | None = None,
     name: str | None = None,
     mime_type: str | None = None,
     set_cover: bool | None = None,
+    file_data_base64: str | None = None,
+    file_name: str | None = None,
 ) -> TrelloAttachment:
-    """Adds a URL attachment to a card. Use this to attach links to external
-    resources like GitHub PRs, documents, images, or any other URL.
+    """Adds an attachment to a card, either by URL or by uploading a file.
+
+    For URL attachments, provide the url parameter. For file uploads, provide
+    file_data_base64 (base64-encoded file content), file_name, and mime_type.
+    Use set_cover=true to make the attachment the card's cover image.
 
     Args:
         card_id (str): The ID of the card to attach to.
-        url (str): The URL to attach.
-        name (str, optional): Display name for the attachment. Defaults to the URL.
-        mime_type (str, optional): MIME type of the resource (e.g. "image/png").
+        url (str, optional): The URL to attach (for link attachments).
+        name (str, optional): Display name for the attachment.
+        mime_type (str, optional): MIME type (e.g. "image/png"). Required for file uploads.
         set_cover (bool, optional): Whether to use this attachment as the card cover image.
+        file_data_base64 (str, optional): Base64-encoded file content for file uploads.
+        file_name (str, optional): Filename for the upload (e.g. "cover.png"). Required for file uploads.
 
     Returns:
         TrelloAttachment: The created attachment object.
     """
     try:
         logger.info(f"Adding attachment to card: {card_id}")
+        file_data = base64.b64decode(file_data_base64) if file_data_base64 else None
         result = await service.add_attachment(
-            card_id, url=url, name=name, mime_type=mime_type, set_cover=set_cover
+            card_id,
+            url=url,
+            name=name,
+            mime_type=mime_type,
+            set_cover=set_cover,
+            file_data=file_data,
+            file_name=file_name,
         )
         logger.info(f"Successfully added attachment to card: {card_id}")
         return result

@@ -97,32 +97,50 @@ class CommentService:
         name: str | None = None,
         mime_type: str | None = None,
         set_cover: bool | None = None,
+        file_data: bytes | None = None,
+        file_name: str | None = None,
     ) -> TrelloAttachment:
-        """Adds a URL attachment to a card.
+        """Adds an attachment to a card via URL or file upload.
 
         Args:
             card_id: The ID of the card.
-            url: The URL to attach.
+            url: The URL to attach (for link attachments).
             name: Optional display name for the attachment.
             mime_type: Optional MIME type of the attachment.
             set_cover: Whether to use this attachment as the card cover.
+            file_data: Raw file bytes to upload (for file attachments).
+            file_name: Filename for the uploaded file (required with file_data).
 
         Returns:
             The created attachment object.
         """
-        data: dict = {}
-        if url is not None:
-            data["url"] = url
-        if name is not None:
-            data["name"] = name
-        if mime_type is not None:
-            data["mimeType"] = mime_type
-        if set_cover is not None:
-            data["setCover"] = str(set_cover).lower()
-        response = await self.client.POST_FORM(
-            f"/cards/{card_id}/attachments",
-            data=data,
-        )
+        if file_data is not None:
+            extra_data: dict = {}
+            if name is not None:
+                extra_data["name"] = name
+            if set_cover is not None:
+                extra_data["setCover"] = str(set_cover).lower()
+            response = await self.client.POST_FILE(
+                f"/cards/{card_id}/attachments",
+                file_data=file_data,
+                filename=file_name or "attachment",
+                mime_type=mime_type or "application/octet-stream",
+                data=extra_data,
+            )
+        else:
+            data: dict = {}
+            if url is not None:
+                data["url"] = url
+            if name is not None:
+                data["name"] = name
+            if mime_type is not None:
+                data["mimeType"] = mime_type
+            if set_cover is not None:
+                data["setCover"] = str(set_cover).lower()
+            response = await self.client.POST_FORM(
+                f"/cards/{card_id}/attachments",
+                data=data,
+            )
         return TrelloAttachment(**response)
 
     async def delete_attachment(self, card_id: str, attachment_id: str) -> Dict[str, Any]:
