@@ -32,6 +32,31 @@ class TrelloLabel(BaseModel):
     color: str | None = None
 
 
+class TrelloComment(BaseModel):
+    """Model representing a Trello comment (action of type commentCard)."""
+
+    id: str
+    idMemberCreator: str
+    type: str
+    date: str
+    data: dict
+    memberCreator: dict | None = None
+
+
+class TrelloAttachment(BaseModel):
+    """Model representing a Trello card attachment."""
+
+    id: str
+    name: str
+    url: str
+    bytes: int | None = None
+    mimeType: str | None = None
+    isUpload: bool = False
+    date: str
+    edgeColor: str | None = None
+    pos: float | None = None
+
+
 class TrelloCard(BaseModel):
     """Model representing a Trello card."""
 
@@ -45,3 +70,4 @@ class TrelloCard(BaseModel):
     pos: float
     labels: List[TrelloLabel] = []
     due: str | None = None
+    cardRole: str | None = None

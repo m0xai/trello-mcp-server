@@ -1,0 +1,5 @@
+mcp[cli]>=1.6.0
+httpx>=0.28.1
+uvicorn>=0.30.0
+starlette>=0.37.0
+python-dotenv>=1.0.0

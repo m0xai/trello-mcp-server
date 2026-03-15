@@ -52,7 +52,15 @@ def trello_help() -> str:
        - Create a new card
        - Update a card's attributes
        - Delete a card
-    4. Checklist Operations:
+    4. Comment & Attachment Operations:
+       - Get all comments on a card
+       - Add a comment to a card (supports markdown and @mentions)
+       - Update an existing comment
+       - Delete a comment
+       - Get all attachments on a card
+       - Add a URL attachment to a card
+       - Delete an attachment
+    5. Checklist Operations:
        - Get a specific checklist
        - List all checklists in a card
        - Create a new checklist
