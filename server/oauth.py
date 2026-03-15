@@ -348,6 +348,10 @@ def create_http_app(mcp_server: Server, auth_token: str) -> Starlette:
                 )
                 await response(scope, receive, send)
                 return
+            # Rewrite path to "/" — the session manager expects root since
+            # Mount would have stripped the prefix, but we use Route to avoid
+            # Starlette's trailing-slash redirect.
+            scope = dict(scope, path="/")
             await session_manager.handle_request(scope, receive, send)
 
     handle_mcp = McpEndpoint()
