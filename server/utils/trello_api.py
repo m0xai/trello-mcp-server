@@ -76,6 +76,23 @@ class TrelloClient:
             logger.error(f"Request error: {e}")
             raise httpx.RequestError(f"Failed to put to {endpoint}: {str(e)}")
 
+    async def POST_FORM(self, endpoint: str, data: dict = None):
+        all_params = {"key": self.api_key, "token": self.token}
+        try:
+            response = await self.client.post(endpoint, params=all_params, data=data)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error: {e}")
+            raise httpx.HTTPStatusError(
+                f"Failed to post form to {endpoint}: {str(e)}",
+                request=e.request,
+                response=e.response,
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}")
+            raise httpx.RequestError(f"Failed to post form to {endpoint}: {str(e)}")
+
     async def DELETE(self, endpoint: str, params: dict = None):
         all_params = {"key": self.api_key, "token": self.token}
         if params:

@@ -2,7 +2,7 @@
 This module contains tools for managing Trello boards, lists, and cards.
 """
 
-from server.tools import board, card, checklist, list
+from server.tools import board, card, checklist, comment, list
 
 
 def register_tools(mcp):
@@ -26,6 +26,15 @@ def register_tools(mcp):
     mcp.add_tool(card.create_card)
     mcp.add_tool(card.update_card)
     mcp.add_tool(card.delete_card)
+
+    # Comment & Attachment Tools
+    mcp.add_tool(comment.get_comments)
+    mcp.add_tool(comment.add_comment)
+    mcp.add_tool(comment.update_comment)
+    mcp.add_tool(comment.delete_comment)
+    mcp.add_tool(comment.get_attachments)
+    mcp.add_tool(comment.add_attachment)
+    mcp.add_tool(comment.delete_attachment)
 
     # Checklist Tools
     mcp.add_tool(checklist.get_checklist)
