@@ -22,7 +22,7 @@ from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
-from starlette.routing import Mount, Route
+from starlette.routing import Route
 
 logger = logging.getLogger(__name__)
 
@@ -319,29 +319,38 @@ def create_http_app(mcp_server: Server, auth_token: str) -> Starlette:
             return JSONResponse({"error": error}, status_code=400)
         return JSONResponse(tokens)
 
-    async def handle_mcp(scope, receive, send):
-        request = Request(scope, receive, send)
-        server_url = str(request.base_url).rstrip("/")
-        www_auth = f'Bearer resource_metadata="{server_url}/.well-known/oauth-protected-resource"'
-        auth_header = request.headers.get("authorization", "")
-        if not auth_header.startswith("Bearer "):
-            response = JSONResponse(
-                {"error": "Missing bearer token"},
-                status_code=401,
-                headers={"WWW-Authenticate": www_auth},
-            )
-            await response(scope, receive, send)
-            return
-        token = auth_header[len("Bearer ") :]
-        if not oauth.validate_token(token):
-            response = JSONResponse(
-                {"error": "Invalid or expired token"},
-                status_code=401,
-                headers={"WWW-Authenticate": www_auth},
-            )
-            await response(scope, receive, send)
-            return
-        await session_manager.handle_request(scope, receive, send)
+    class McpEndpoint:
+        """ASGI app that wraps the MCP session manager with OAuth token validation.
+
+        Defined as a class (not a function) so that Starlette's Route treats it
+        as a raw ASGI application instead of wrapping it in request_response().
+        """
+
+        async def __call__(self, scope, receive, send):
+            request = Request(scope, receive, send)
+            server_url = str(request.base_url).rstrip("/")
+            www_auth = f'Bearer resource_metadata="{server_url}/.well-known/oauth-protected-resource"'
+            auth_header = request.headers.get("authorization", "")
+            if not auth_header.startswith("Bearer "):
+                response = JSONResponse(
+                    {"error": "Missing bearer token"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": www_auth},
+                )
+                await response(scope, receive, send)
+                return
+            token = auth_header[len("Bearer ") :]
+            if not oauth.validate_token(token):
+                response = JSONResponse(
+                    {"error": "Invalid or expired token"},
+                    status_code=401,
+                    headers={"WWW-Authenticate": www_auth},
+                )
+                await response(scope, receive, send)
+                return
+            await session_manager.handle_request(scope, receive, send)
+
+    handle_mcp = McpEndpoint()
 
     async def handle_health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "server": "trello-mcp"})
@@ -368,7 +377,7 @@ def create_http_app(mcp_server: Server, auth_token: str) -> Starlette:
             Route("/login", endpoint=handle_login, methods=["GET", "POST"]),
             Route("/token", endpoint=handle_token, methods=["POST"]),
             Route("/health", endpoint=handle_health, methods=["GET"]),
-            Mount("/mcp", app=handle_mcp),
+            Route("/mcp", endpoint=handle_mcp, methods=["GET", "POST", "DELETE"]),
         ],
         lifespan=lifespan,
     )
