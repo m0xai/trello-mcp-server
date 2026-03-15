@@ -19,5 +19,5 @@ COPY . .
 ENV MCP_SERVER_PORT=8000
 EXPOSE ${MCP_SERVER_PORT}
 
-# Run the application
-CMD ["python", "main.py"] 
+# Run the application in HTTP mode with OAuth
+CMD ["python", "main.py", "--transport", "http"]
