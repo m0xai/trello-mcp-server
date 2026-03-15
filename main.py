@@ -91,7 +91,7 @@ def start_http_server(host: str, port: int):
                 "MCP_AUTH_TOKEN environment variable is required for HTTP transport"
             )
 
-        http_app = create_http_app(mcp.sse_app(), auth_token)
+        http_app = create_http_app(mcp._mcp_server, auth_token)
 
         logger.info(
             f"Starting Trello MCP Server in HTTP mode on http://{host}:{port}..."

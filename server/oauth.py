@@ -15,11 +15,11 @@ import time
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 
+from mcp.server.sse import SseServerTransport
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from starlette.routing import Mount, Route
-from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
@@ -197,14 +197,15 @@ LOGIN_PAGE_HTML = """<!DOCTYPE html>
 </html>"""
 
 
-def create_http_app(sse_app: ASGIApp, auth_token: str) -> Starlette:
+def create_http_app(mcp_server, auth_token: str) -> Starlette:
     """Create a Starlette app with OAuth 2.0 authentication for remote MCP access.
 
     Args:
-        sse_app: The ASGI app from FastMCP.sse_app() that handles SSE transport.
+        mcp_server: The low-level MCP Server instance (e.g. from FastMCP._mcp_server).
         auth_token: The password/token used for the OAuth login flow.
     """
     oauth = SimpleOAuthProvider(auth_token)
+    sse = SseServerTransport("/messages/")
 
     async def handle_oauth_metadata(request: Request) -> Response:
         server_url = str(request.base_url).rstrip("/")
@@ -315,31 +316,49 @@ def create_http_app(sse_app: ASGIApp, auth_token: str) -> Starlette:
             return JSONResponse({"error": error}, status_code=400)
         return JSONResponse(tokens)
 
-    async def auth_middleware(scope, receive, send):
-        """ASGI middleware that validates OAuth bearer tokens before forwarding to the SSE app."""
-        if scope["type"] in ("http", "websocket"):
-            request = Request(scope, receive, send)
-            server_url = str(request.base_url).rstrip("/")
-            www_auth = f'Bearer resource_metadata="{server_url}/.well-known/oauth-protected-resource"'
-            auth_header = request.headers.get("authorization", "")
-            if not auth_header.startswith("Bearer "):
-                response = JSONResponse(
-                    {"error": "Missing bearer token"},
-                    status_code=401,
-                    headers={"WWW-Authenticate": www_auth},
-                )
-                await response(scope, receive, send)
-                return
-            token = auth_header[len("Bearer ") :]
-            if not oauth.validate_token(token):
-                response = JSONResponse(
-                    {"error": "Invalid or expired token"},
-                    status_code=401,
-                    headers={"WWW-Authenticate": www_auth},
-                )
-                await response(scope, receive, send)
-                return
-        await sse_app(scope, receive, send)
+    def _check_bearer(request: Request) -> Optional[Response]:
+        """Validate bearer token. Returns an error Response if invalid, None if OK."""
+        server_url = str(request.base_url).rstrip("/")
+        www_auth = f'Bearer resource_metadata="{server_url}/.well-known/oauth-protected-resource"'
+        auth_header = request.headers.get("authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return JSONResponse(
+                {"error": "Missing bearer token"},
+                status_code=401,
+                headers={"WWW-Authenticate": www_auth},
+            )
+        token = auth_header[len("Bearer ") :]
+        if not oauth.validate_token(token):
+            return JSONResponse(
+                {"error": "Invalid or expired token"},
+                status_code=401,
+                headers={"WWW-Authenticate": www_auth},
+            )
+        return None
+
+    async def handle_sse_endpoint(request: Request) -> Response:
+        """SSE endpoint with OAuth bearer token validation."""
+        error = _check_bearer(request)
+        if error:
+            return error
+        async with sse.connect_sse(
+            request.scope, request.receive, request._send
+        ) as streams:
+            await mcp_server.run(
+                streams[0],
+                streams[1],
+                mcp_server.create_initialization_options(),
+            )
+        return Response()
+
+    async def handle_messages(scope, receive, send):
+        """Messages endpoint with OAuth bearer token validation."""
+        request = Request(scope, receive, send)
+        error = _check_bearer(request)
+        if error:
+            await error(scope, receive, send)
+            return
+        await sse.handle_post_message(scope, receive, send)
 
     async def handle_health(request: Request) -> Response:
         return JSONResponse({"status": "ok", "server": "trello-mcp"})
@@ -361,7 +380,7 @@ def create_http_app(sse_app: ASGIApp, auth_token: str) -> Starlette:
             Route("/login", endpoint=handle_login, methods=["GET", "POST"]),
             Route("/token", endpoint=handle_token, methods=["POST"]),
             Route("/health", endpoint=handle_health, methods=["GET"]),
-            # SSE transport behind OAuth — must be last (catch-all)
-            Mount("/", app=auth_middleware),
+            Route("/sse", endpoint=handle_sse_endpoint),
+            Mount("/messages/", app=handle_messages),
         ],
     )
