@@ -7,7 +7,7 @@ from typing import List
 
 from mcp.server.fastmcp import Context
 
-from server.models import TrelloBoard, TrelloLabel
+from server.models import TrelloBoard, TrelloLabel, TrelloMember
 from server.dtos.create_label import CreateLabelPayload
 from server.services.board import BoardService
 from server.trello import client
@@ -72,6 +72,27 @@ async def get_board_labels(ctx: Context, board_id: str) -> List[TrelloLabel]:
         return result
     except Exception as e:
         error_msg = f"Failed to get board labels: {str(e)}"
+        logger.error(error_msg)
+        await ctx.error(error_msg)
+        raise
+
+
+async def get_board_members(ctx: Context, board_id: str) -> List[TrelloMember]:
+    """Retrieves all members of a specific board.
+
+    Args:
+        board_id (str): The ID of the board whose members to retrieve.
+
+    Returns:
+        List[TrelloMember]: A list of member objects with id, fullName, and username.
+    """
+    try:
+        logger.info(f"Getting members for board: {board_id}")
+        result = await service.get_board_members(board_id)
+        logger.info(f"Successfully retrieved {len(result)} members for board: {board_id}")
+        return result
+    except Exception as e:
+        error_msg = f"Failed to get board members: {str(e)}"
         logger.error(error_msg)
         await ctx.error(error_msg)
         raise

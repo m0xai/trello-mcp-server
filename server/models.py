@@ -1,4 +1,4 @@
-from typing import List
+from typing import Any, Dict, List
 
 from pydantic import BaseModel
 
@@ -26,10 +26,18 @@ class TrelloList(BaseModel):
 
 class TrelloLabel(BaseModel):
     """Model representing a Trello label."""
-    
+
     id: str
     name: str
     color: str | None = None
+
+
+class TrelloMember(BaseModel):
+    """Model representing a Trello member."""
+
+    id: str
+    fullName: str
+    username: str
 
 
 class TrelloCard(BaseModel):
@@ -45,3 +53,8 @@ class TrelloCard(BaseModel):
     pos: float
     labels: List[TrelloLabel] = []
     due: str | None = None
+    idMembers: List[str] = []
+    dueComplete: bool = False
+    cover: Dict[str, Any] | None = None
+    subscribed: bool = False
+    attachments: List[Dict[str, Any]] = []
