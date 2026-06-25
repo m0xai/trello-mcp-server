@@ -59,7 +59,63 @@ class BoardService:
             board_id (str): The ID of the board whose to add label.
 
         Returns:
-            List[TrelloLabel]: A list of label objects for the board.
+            TrelloLabel: A label object for the board.
         """
         response = await self.client.POST(f"/boards/{board_id}/labels", data=kwargs)
         return TrelloLabel(**response)
+
+    async def create_board(self, **kwargs) -> TrelloBoard:
+        """Create a new board.
+
+        Args:
+            **kwargs: Board creation parameters (name, desc, idOrganization, etc.)
+
+        Returns:
+            TrelloBoard: The newly created board object.
+        """
+        # Convert Python naming to Trello API naming
+        params = {}
+        if "name" in kwargs:
+            params["name"] = kwargs["name"]
+        if "desc" in kwargs:
+            params["desc"] = kwargs["desc"]
+        if "id_organization" in kwargs and kwargs["id_organization"]:
+            params["idOrganization"] = kwargs["id_organization"]
+        if "default_lists" in kwargs:
+            params["defaultLists"] = kwargs["default_lists"]
+        if "default_labels" in kwargs:
+            params["defaultLabels"] = kwargs["default_labels"]
+        if "prefs_permission_level" in kwargs:
+            params["prefs_permissionLevel"] = kwargs["prefs_permission_level"]
+        if "prefs_voting" in kwargs and kwargs["prefs_voting"]:
+            params["prefs_voting"] = kwargs["prefs_voting"]
+        if "prefs_comments" in kwargs and kwargs["prefs_comments"]:
+            params["prefs_comments"] = kwargs["prefs_comments"]
+
+        response = await self.client.POST("/boards", params=params)
+        return TrelloBoard(**response)
+
+    async def update_board(self, board_id: str, **kwargs) -> TrelloBoard:
+        """Update an existing board.
+
+        Args:
+            board_id (str): The ID of the board to update.
+            **kwargs: Board update parameters
+
+        Returns:
+            TrelloBoard: The updated board object.
+        """
+        response = await self.client.PUT(f"/boards/{board_id}", params=kwargs)
+        return TrelloBoard(**response)
+
+    async def delete_board(self, board_id: str) -> dict:
+        """Delete (permanently remove) a board.
+
+        Args:
+            board_id (str): The ID of the board to delete.
+
+        Returns:
+            dict: Response from the API.
+        """
+        response = await self.client.DELETE(f"/boards/{board_id}")
+        return response
