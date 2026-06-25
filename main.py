@@ -44,7 +44,7 @@ def start_claude_server():
 
 
 def start_sse_server():
-    """Start the MCP server in SSE mode using uvicorn"""
+    """Start the MCP server in HTTP mode using uvicorn"""
     try:
         # Verify environment variables
         if not os.getenv("TRELLO_API_KEY") or not os.getenv("TRELLO_TOKEN"):
@@ -55,19 +55,15 @@ def start_sse_server():
         host = os.getenv("MCP_SERVER_HOST", "0.0.0.0")
         port = int(os.getenv("MCP_SERVER_PORT", "8000"))
 
-        # Create Starlette app with MCP server mounted
-        app = Starlette(
-            routes=[
-                Mount("/", app=mcp.sse_app()),
-            ]
-        )
+        # Create HTTP app - use streamable_http_app directly
+        app = mcp.streamable_http_app()
 
         logger.info(
-            f"Starting Trello MCP Server in SSE mode on http://{host}:{port}..."
+            f"Starting Trello MCP Server in HTTP mode on http://{host}:{port}..."
         )
         uvicorn.run(app, host=host, port=port)
     except Exception as e:
-        logger.error(f"Error starting SSE server: {str(e)}")
+        logger.error(f"Error starting HTTP server: {str(e)}")
         raise
 
 
