@@ -3,7 +3,7 @@ import os
 
 import uvicorn
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from starlette.applications import Starlette
 from starlette.routing import Mount
 
@@ -20,7 +20,7 @@ load_dotenv()
 
 
 # Initialize MCP server
-mcp = FastMCP("Trello MCP Server")
+mcp = MCPServer("Trello MCP Server")
 
 # Register tools
 register_tools(mcp)

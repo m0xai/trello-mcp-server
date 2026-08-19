@@ -5,7 +5,7 @@ This module contains tools for managing Trello boards.
 import logging
 from typing import List
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 
 from server.models import TrelloBoard, TrelloLabel
 from server.dtos.create_label import CreateLabelPayload

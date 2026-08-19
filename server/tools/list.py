@@ -5,7 +5,7 @@ This module contains tools for managing Trello lists.
 import logging
 from typing import List
 
-from mcp.server.fastmcp import Context
+from mcp.server.mcpserver import Context
 
 from server.models import TrelloList
 from server.services.list import ListService
